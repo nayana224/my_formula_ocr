@@ -11,13 +11,24 @@ class ImageView(QLabel):
     image_file_dropped = Signal(object)
 
     def __init__(self) -> None:
-        super().__init__("이미지를 열거나 여기에 드래그하세요.\nCtrl+V로 clipboard 이미지도 붙여넣을 수 있습니다.")
+        super().__init__(
+            "Drop an equation image here\n"
+            "or use Open / Paste / Capture\n\n"
+            "Ctrl+V  ·  Ctrl+Shift+X"
+        )
         self._pixmap = QPixmap()
         self.setAcceptDrops(True)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setMinimumSize(420, 300)
+        self.setMinimumSize(360, 280)
         self.setStyleSheet(
-            "QLabel { border: 2px dashed #777; border-radius: 10px; padding: 16px; }"
+            "QLabel {"
+            "background: #fbfcfe;"
+            "color: #667085;"
+            "border: 1px dashed #b8c4d6;"
+            "border-radius: 9px;"
+            "padding: 16px;"
+            "font-size: 13px;"
+            "}"
         )
 
     def set_image(self, pixmap: QPixmap) -> None:
