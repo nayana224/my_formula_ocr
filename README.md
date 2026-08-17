@@ -14,7 +14,9 @@ Equation image / copied math text → editable LaTeX desktop app for Linux and W
 - Choose Raw LaTeX, `$...$`, `\[...\]`, or `equation` output from one selector.
 - Keep Auto OCR / Auto Copy / output format preferences between runs.
 - Run local image OCR through `pix2tex` without sending the image to a remote API.
-- Show the rendered Preview as the primary result and keep raw LaTeX as an editable secondary view.
+- Render Preview with KaTeX when Qt WebEngine and KaTeX assets are available.
+- Fall back automatically to the existing matplotlib `mathtext` Preview when KaTeX cannot load or parse the expression.
+- Keep raw LaTeX as an editable secondary view.
 - Show non-blocking warnings for suspicious formula OCR or heuristic Text-to-LaTeX recovery.
 - Search local SQLite history, pin favorites, and delete individual entries.
 - Exit safely with `Ctrl+C`; an in-progress OCR is allowed to finish before shutdown.
@@ -29,7 +31,8 @@ Global capture: Ctrl+Alt+M
                   ↓
                  OCR
                   ↓
-          Rendered Preview
+       KaTeX Rendered Preview
+       └─ fallback: mathtext
                   ↓
        Editable LaTeX + History
                   ↓
@@ -39,7 +42,8 @@ Image: Open / Drop / Capture / Smart Paste
                   ↓
                  OCR
                   ↓
-          Rendered Preview
+       KaTeX Rendered Preview
+       └─ fallback: mathtext
                   ↓
        Editable LaTeX + History
                   ↓
@@ -49,7 +53,7 @@ Text: Type / Smart Paste
           ↓
   Text → LaTeX normalization
           ↓
-     Live Rendered Preview
+    Live Rendered Preview
           ↓
       Convert Text 확정
           ↓
@@ -57,6 +61,26 @@ Text: Type / Smart Paste
 ```
 
 `Auto OCR` and `Auto Copy` are enabled by default. Text typing updates the preview with a short debounce, but it is only written to History when `Convert Text` or Smart Paste confirms the conversion.
+
+## Preview renderer
+
+Formula OCR v0.6.0 uses a two-stage Preview path:
+
+```text
+LaTeX
+  ↓
+KaTeX in Qt WebEngine
+  ↓ success
+Rendered Preview
+
+  └ failure / unavailable / offline
+          ↓
+matplotlib mathtext fallback
+```
+
+The KaTeX path uses a pinned KaTeX 0.17.0 browser build. The current implementation loads the KaTeX CSS, JavaScript, and fonts from jsDelivr. If those resources cannot be loaded, the existing local matplotlib renderer remains available automatically, so OCR and copy workflows do not depend on network access.
+
+A future standalone packaging step can vendor the KaTeX assets so the richer Preview is also fully offline.
 
 ## Global capture shortcut
 
@@ -160,16 +184,17 @@ python -m flake8 src tests --max-line-length=100
 ## Known limitations
 
 - Text-to-LaTeX cannot perfectly restore structure that the source application removed during copy. Warnings mark heuristic or ambiguous recovery.
-- The preview uses matplotlib `mathtext`, not a full TeX engine. Output can still be copied when preview rendering fails.
+- Rich KaTeX Preview currently loads browser assets from jsDelivr; without network access the app falls back to local matplotlib `mathtext`.
+- KaTeX supports a broad subset of TeX but not every LaTeX package or command. Unsupported expressions fall back to mathtext when possible.
 - `pix2tex` is intended for mathematical expressions. Non-math screenshots can produce meaningless LaTeX.
 - Region capture currently uses Qt screen capture. Some Wayland policies can block or limit desktop screenshots.
 - The system-wide `Ctrl+Alt+M` shortcut is currently supported on Windows and Linux X11, but not treated as reliable on Wayland.
 
 ## Next milestone
 
-1. Validate v0.5.0 global capture on Ubuntu X11 and Windows.
-2. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
-3. Replace mathtext preview with a fuller LaTeX/KaTeX rendering path.
+1. Validate v0.6.0 KaTeX-first Preview on Ubuntu and Windows.
+2. Vendor KaTeX assets during standalone packaging so rich Preview works fully offline.
+3. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
 4. Evaluate a separate Mixed Text + Formula mode without changing stable Formula mode.
 5. Add standalone Ubuntu and Windows builds and GitHub Releases.
 
