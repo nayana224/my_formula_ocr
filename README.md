@@ -64,7 +64,7 @@ Text: Type / Smart Paste
 
 ## Preview renderer
 
-Formula OCR v0.6.0 uses a two-stage Preview path:
+Formula OCR v0.6.x uses a two-stage Preview path:
 
 ```text
 LaTeX
@@ -79,6 +79,8 @@ matplotlib mathtext fallback
 ```
 
 The KaTeX path uses a pinned KaTeX 0.17.0 browser build. The current implementation loads the KaTeX CSS, JavaScript, and fonts from jsDelivr. If those resources cannot be loaded, the existing local matplotlib renderer remains available automatically, so OCR and copy workflows do not depend on network access.
+
+On Linux, Formula OCR adds `--disable-gpu` to `QTWEBENGINE_CHROMIUM_FLAGS` before creating the application. This keeps Qt WebEngine on Chromium's software-rendering path and avoids unnecessary GPU/Vulkan initialization for the lightweight formula Preview. Existing user-provided Chromium flags are preserved. This setting does not disable PyTorch OCR acceleration or change the rest of the Qt Widgets UI.
 
 A future standalone packaging step can vendor the KaTeX assets so the richer Preview is also fully offline.
 
@@ -192,7 +194,7 @@ python -m flake8 src tests --max-line-length=100
 
 ## Next milestone
 
-1. Validate v0.6.0 KaTeX-first Preview on Ubuntu and Windows.
+1. Validate v0.6.1 KaTeX Preview software rendering on Ubuntu.
 2. Vendor KaTeX assets during standalone packaging so rich Preview works fully offline.
 3. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
 4. Evaluate a separate Mixed Text + Formula mode without changing stable Formula mode.
