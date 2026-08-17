@@ -10,7 +10,8 @@ Equation image → editable LaTeX desktop app for Linux and Windows.
 - Choose Raw LaTeX, `$...$`, `\[...\]`, or `equation` output from one selector.
 - Keep Auto OCR / Auto Copy / output format preferences between runs.
 - Run local OCR through `pix2tex` without sending the image to a remote API.
-- Edit recognized LaTeX and preview common math with matplotlib mathtext.
+- Show the rendered Preview as the primary result and keep raw LaTeX as an editable secondary view.
+- Show a non-blocking warning when the LaTeX strongly resembles natural text misread as a formula.
 - Search local SQLite history, pin favorites, and delete individual entries.
 - Exit safely with `Ctrl+C`; an in-progress OCR is allowed to finish before shutdown.
 - Run unit tests on Ubuntu and Windows with GitHub Actions.
@@ -24,12 +25,16 @@ Open / Paste / Drop / Capture
         ↓
       OCR
         ↓
-  Preview + History
+ Rendered Preview
         ↓
-Clipboard copy
+ Editable LaTeX + History
+        ↓
+ Clipboard copy
 ```
 
 `Auto OCR` and `Auto Copy` are enabled by default. Turn either option off in the main window when manual control is preferred. The selected output format is also saved for the next run.
+
+Formula OCR currently operates in **Formula mode**. Select only the mathematical expression when possible. Natural-language text mixed into the capture can be interpreted as mathematical symbols because `pix2tex` is a formula-recognition model rather than a general text OCR engine.
 
 ## Ubuntu development setup
 
@@ -93,15 +98,17 @@ python -m flake8 src tests --max-line-length=100
 
 - The preview uses matplotlib `mathtext`, not a full TeX engine. OCR output can still be copied even when preview rendering fails.
 - `pix2tex` is intended for mathematical expressions. Non-math screenshots can produce meaningless LaTeX, so results must be reviewed.
+- The mixed-text warning is intentionally conservative and is only a hint; it does not reject or modify OCR output.
 - Region capture currently uses Qt screen capture. Linux desktop security policies, especially some Wayland sessions, can block or limit desktop screenshots.
 - `Ctrl+Shift+X` is an application shortcut, not a system-wide global hotkey. The Formula OCR window must be focused when starting capture.
 
 ## Next milestone
 
-1. Validate the v0.3 automated workflow on Ubuntu and Windows.
+1. Validate the Preview-first v0.3.1 workflow on Ubuntu and Windows.
 2. Add an optional system-wide global hotkey with explicit platform handling.
 3. Replace the mathtext preview with a fuller LaTeX/KaTeX rendering path.
-4. Add standalone Ubuntu and Windows builds and GitHub Releases.
+4. Evaluate a separate Mixed Text + Formula mode without changing the stable Formula mode path.
+5. Add standalone Ubuntu and Windows builds and GitHub Releases.
 
 ## License
 
