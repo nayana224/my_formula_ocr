@@ -22,6 +22,18 @@ QLabel#preview {
     border-radius: 9px;
     color: #667085;
 }
+QLabel#formulaWarning {
+    background: #fff7ed;
+    color: #9a3412;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-weight: 600;
+}
+QLabel#hintLabel {
+    color: #667085;
+    font-size: 12px;
+}
 QPlainTextEdit, QLineEdit, QListWidget, QComboBox {
     background: #fbfcfe;
     color: #172033;
