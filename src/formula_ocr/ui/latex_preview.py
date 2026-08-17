@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import html
+from importlib.resources import files
+from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QLabel, QStackedLayout, QWidget
 
@@ -61,7 +63,8 @@ class LatexPreviewWidget(QWidget):
 
         # 비동기 KaTeX 로딩 동안에는 최신 mathtext 결과를 보여준다.
         self._show_fallback()
-        self._web_view.setHtml(build_katex_html(latex))
+        document, base_url = build_katex_document(latex)
+        self._web_view.setHtml(document, base_url)
 
     def _on_load_finished(self, success: bool) -> None:
         if not success or self._web_view is None:
@@ -106,23 +109,50 @@ def install_latex_preview(window) -> LatexPreviewWidget:
     return preview
 
 
-def build_katex_html(latex: str) -> str:
-    """사용자 LaTeX를 HTML attribute로 escape해 안전한 KaTeX 문서를 만든다."""
+def katex_asset_directory() -> Path:
+    """설치된 Formula OCR package 내부 KaTeX asset 경로를 반환한다."""
+    return Path(str(files("formula_ocr").joinpath("assets", "katex")))
+
+
+def local_katex_assets_available() -> bool:
+    asset_dir = katex_asset_directory()
+    fonts_dir = asset_dir / "fonts"
+    return (
+        (asset_dir / "katex.min.css").is_file()
+        and (asset_dir / "katex.min.js").is_file()
+        and fonts_dir.is_dir()
+        and any(fonts_dir.glob("*.woff2"))
+    )
+
+
+def build_katex_document(latex: str) -> tuple[str, QUrl]:
+    """로컬 KaTeX를 우선 사용하고 없으면 기존 CDN 경로를 유지한다."""
+    if local_katex_assets_available():
+        asset_dir = katex_asset_directory()
+        base_url = QUrl.fromLocalFile(str(asset_dir) + "/")
+        return build_katex_html(latex, use_local_assets=True), base_url
+    return build_katex_html(latex, use_local_assets=False), QUrl()
+
+
+def build_katex_html(latex: str, *, use_local_assets: bool = False) -> str:
+    """사용자 LaTeX를 escape한 KaTeX HTML 문서를 만든다."""
     escaped = html.escape(latex, quote=True)
-    css_url = (
-        f"https://cdn.jsdelivr.net/npm/katex@{_KATEX_VERSION}/dist/"
-        "katex.min.css"
-    )
-    js_url = (
-        f"https://cdn.jsdelivr.net/npm/katex@{_KATEX_VERSION}/dist/"
-        "katex.min.js"
-    )
+    if use_local_assets:
+        css_url = "katex.min.css"
+        js_url = "katex.min.js"
+        crossorigin = ""
+    else:
+        base = f"https://cdn.jsdelivr.net/npm/katex@{_KATEX_VERSION}/dist"
+        css_url = f"{base}/katex.min.css"
+        js_url = f"{base}/katex.min.js"
+        crossorigin = ' crossorigin="anonymous"'
+
     return f"""<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
 <meta name="color-scheme" content="light">
-<link rel="stylesheet" href="{css_url}" crossorigin="anonymous">
+<link rel="stylesheet" href="{css_url}"{crossorigin}>
 <style>
 html, body {{ margin: 0; min-height: 100%; background: #fbfcfe; }}
 body {{
@@ -139,7 +169,7 @@ body {{
   font-size: 1.15rem;
 }}
 </style>
-<script defer src="{js_url}" crossorigin="anonymous"></script>
+<script defer src="{js_url}"{crossorigin}></script>
 </head>
 <body>
 <div id="formula" data-tex="{escaped}"></div>
