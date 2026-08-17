@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "formula-ocr"
-version = "0.5.0"
+version = "0.6.0"
 description = "Cross-platform desktop app for converting equation images and copied math text to LaTeX."
 readme = "README.md"
 requires-python = ">=3.10"
