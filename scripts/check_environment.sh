@@ -9,6 +9,8 @@ if [[ ! -x .venv/bin/python ]]; then
   exit 1
 fi
 
+# Formula OCR은 ROS와 독립된 앱이므로 현재 shell의 ROS PYTHONPATH를 상속하지 않는다.
+unset PYTHONPATH
 source .venv/bin/activate
 python - <<'PY'
 import importlib
