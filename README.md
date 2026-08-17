@@ -9,6 +9,7 @@ Equation image / copied math text → editable LaTeX desktop app for Linux and W
 - Type or paste copied/rendered math text in `Text Input` and see a live LaTeX preview.
 - Recover common flattened Unicode math patterns such as superscripts, subscripts, symbols, simple fractions, and selected sum patterns.
 - Capture a screen region with `Ctrl+Shift+X` and run OCR immediately.
+- Use `Ctrl+Alt+M` as a system-wide capture shortcut on Windows and Ubuntu X11.
 - Copy OCR/conversion output automatically in the selected format.
 - Choose Raw LaTeX, `$...$`, `\[...\]`, or `equation` output from one selector.
 - Keep Auto OCR / Auto Copy / output format preferences between runs.
@@ -22,6 +23,18 @@ Equation image / copied math text → editable LaTeX desktop app for Linux and W
 ## Default workflow
 
 ```text
+Global capture: Ctrl+Alt+M
+                  ↓
+          Select formula area
+                  ↓
+                 OCR
+                  ↓
+          Rendered Preview
+                  ↓
+       Editable LaTeX + History
+                  ↓
+           Clipboard copy
+
 Image: Open / Drop / Capture / Smart Paste
                   ↓
                  OCR
@@ -44,6 +57,28 @@ Text: Type / Smart Paste
 ```
 
 `Auto OCR` and `Auto Copy` are enabled by default. Text typing updates the preview with a short debounce, but it is only written to History when `Convert Text` or Smart Paste confirms the conversion.
+
+## Global capture shortcut
+
+Formula OCR tries to start `Ctrl+Alt+M` automatically when the application launches.
+
+- Windows: supported through the `pynput` Windows keyboard backend.
+- Ubuntu/Linux X11: supported when an X server is running and `DISPLAY` is available.
+- Wayland: currently disabled intentionally. `pynput` only receives limited events through Xwayland, so Formula OCR does not pretend the shortcut is reliable there.
+
+When the global shortcut is available, Formula OCR does not need focus:
+
+```text
+PDF / browser / presentation focused
+              ↓
+         Ctrl+Alt+M
+              ↓
+       select equation
+              ↓
+ OCR → Auto Copy → paste anywhere
+```
+
+The existing `Ctrl+Shift+X` application shortcut remains available as a fallback when the Formula OCR window is focused.
 
 ## Text → LaTeX
 
@@ -73,6 +108,13 @@ cd formula_ocr
 
 `pix2tex` can download model checkpoints on the first OCR run. The first run can therefore take longer and requires network access.
 
+After pulling a version that adds new Python dependencies, refresh the editable environment with:
+
+```bash
+source .venv/bin/activate
+python -m pip install -e ".[ocr,dev]"
+```
+
 ### Manual setup
 
 ```bash
@@ -98,9 +140,10 @@ python -m formula_ocr
 
 | Shortcut | Action |
 |---|---|
+| `Ctrl+Alt+M` | Global capture on Windows / Linux X11 |
 | `Ctrl+O` | Open image |
 | `Ctrl+V` | Smart Paste: image OCR or text conversion |
-| `Ctrl+Shift+X` | Capture region → OCR |
+| `Ctrl+Shift+X` | Focused app capture region → OCR |
 | `Ctrl+Enter` | Run image OCR manually |
 | `Ctrl+Shift+C` | Copy selected output format |
 | `Ctrl+C` in terminal | Safe application shutdown |
@@ -120,12 +163,12 @@ python -m flake8 src tests --max-line-length=100
 - The preview uses matplotlib `mathtext`, not a full TeX engine. Output can still be copied when preview rendering fails.
 - `pix2tex` is intended for mathematical expressions. Non-math screenshots can produce meaningless LaTeX.
 - Region capture currently uses Qt screen capture. Some Wayland policies can block or limit desktop screenshots.
-- `Ctrl+Shift+X` is an application shortcut, not a system-wide global hotkey.
+- The system-wide `Ctrl+Alt+M` shortcut is currently supported on Windows and Linux X11, but not treated as reliable on Wayland.
 
 ## Next milestone
 
-1. Validate v0.4.0 Smart Paste and Text-to-LaTeX on Ubuntu and Windows.
-2. Add an optional system-wide global hotkey with explicit platform handling.
+1. Validate v0.5.0 global capture on Ubuntu X11 and Windows.
+2. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
 3. Replace mathtext preview with a fuller LaTeX/KaTeX rendering path.
 4. Evaluate a separate Mixed Text + Formula mode without changing stable Formula mode.
 5. Add standalone Ubuntu and Windows builds and GitHub Releases.
