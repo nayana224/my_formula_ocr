@@ -4,6 +4,9 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Formula OCR은 ROS와 독립된 앱이므로 현재 shell의 ROS PYTHONPATH를 상속하지 않는다.
+unset PYTHONPATH
+
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
