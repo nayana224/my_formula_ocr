@@ -77,6 +77,10 @@ def text_to_latex(text: str) -> TextToLatexResult:
         )
         warnings.append("분수와 합 기호의 배치는 복사된 문자 순서를 바탕으로 추정했습니다.")
 
+    # 1/N, a/b처럼 피연산자가 단일 토큰인 경우만 안전하게 분수로 변환한다.
+    simple_fraction = re.compile(r"(?<![A-Za-z0-9}])([A-Za-z0-9]+)\/([A-Za-z0-9]+)(?![A-Za-z0-9{])")
+    latex = simple_fraction.sub(r"\\frac{\1}{\2}", latex)
+
     latex = _replace_symbols(latex)
     latex = re.sub(r"√\s*\(([^()]*)\)", r"\\sqrt{\1}", latex)
     latex = re.sub(r"√\s*([A-Za-z0-9]+)", r"\\sqrt{\1}", latex)
