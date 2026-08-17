@@ -25,3 +25,9 @@ def test_converts_common_unicode_math_symbols() -> None:
     result = text_to_latex("α≤β→∞")
 
     assert result.latex == r"\alpha\leq\beta\to\infty"
+
+
+def test_converts_simple_fraction() -> None:
+    result = text_to_latex("L=1/N")
+
+    assert result.latex == r"L=\frac{1}{N}"
