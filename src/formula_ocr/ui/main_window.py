@@ -31,6 +31,7 @@ from formula_ocr.history.database import HistoryDatabase, HistoryEntry
 from formula_ocr.latex.formatter import CopyFormat, format_latex
 from formula_ocr.latex.renderer import render_latex_preview
 from formula_ocr.ocr.pix2tex_engine import Pix2TexEngine
+from formula_ocr.ocr.result_quality import looks_suspicious_formula_result
 from formula_ocr.ui.image_view import ImageView
 from formula_ocr.ui.ocr_worker import OcrWorker
 
@@ -96,22 +97,30 @@ class MainWindow(QMainWindow):
 
         self.latex_edit = QPlainTextEdit()
         self.latex_edit.setPlaceholderText("인식된 LaTeX를 여기에서 바로 수정할 수 있습니다.")
+        self.latex_edit.setMinimumHeight(90)
+        self.latex_edit.setMaximumHeight(140)
         self.latex_edit.textChanged.connect(self._refresh_preview)
 
-        self.preview = QLabel("Preview")
+        self.preview = QLabel("Rendered preview")
         self.preview.setObjectName("preview")
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setMinimumHeight(190)
+        self.preview.setMinimumHeight(280)
+
+        self.formula_warning = QLabel()
+        self.formula_warning.setObjectName("formulaWarning")
+        self.formula_warning.setWordWrap(True)
+        self.formula_warning.setVisible(False)
 
         image_card = self._make_card("Source", self.image_view)
 
         result_layout = QVBoxLayout()
         result_layout.setContentsMargins(18, 16, 18, 18)
         result_layout.setSpacing(10)
-        result_layout.addWidget(self._section_label("LaTeX"))
-        result_layout.addWidget(self.latex_edit, 2)
-        result_layout.addWidget(self._section_label("Preview"))
-        result_layout.addWidget(self.preview, 1)
+        result_layout.addWidget(self._section_label("Rendered Preview"))
+        result_layout.addWidget(self.preview, 3)
+        result_layout.addWidget(self.formula_warning)
+        result_layout.addWidget(self._section_label("LaTeX · editable"))
+        result_layout.addWidget(self.latex_edit, 1)
         result_card = QFrame()
         result_card.setObjectName("card")
         result_card.setLayout(result_layout)
@@ -169,6 +178,11 @@ class MainWindow(QMainWindow):
         automation_layout.addWidget(self.output_format)
         automation_layout.addWidget(copy_button)
 
+        formula_tip = QLabel(
+            "Formula mode · 자연어 문장보다 수식 영역만 선택하면 인식 정확도가 높아집니다."
+        )
+        formula_tip.setObjectName("hintLabel")
+
         controls_card = QFrame()
         controls_card.setObjectName("card")
         controls_layout = QVBoxLayout(controls_card)
@@ -176,6 +190,7 @@ class MainWindow(QMainWindow):
         controls_layout.setSpacing(10)
         controls_layout.addLayout(action_layout)
         controls_layout.addLayout(automation_layout)
+        controls_layout.addWidget(formula_tip)
 
         self.history_search = QLineEdit()
         self.history_search.setPlaceholderText("Search history")
@@ -197,8 +212,8 @@ class MainWindow(QMainWindow):
         history_controls.addWidget(clear_button)
 
         self.history_list = QListWidget()
-        self.history_list.setMinimumHeight(110)
-        self.history_list.setMaximumHeight(180)
+        self.history_list.setMinimumHeight(105)
+        self.history_list.setMaximumHeight(160)
         self.history_list.itemDoubleClicked.connect(self._restore_history_item)
 
         history_layout = QVBoxLayout()
@@ -433,8 +448,9 @@ class MainWindow(QMainWindow):
 
     def _refresh_preview(self) -> None:
         latex = self.latex_edit.toPlainText().strip()
+        self._refresh_formula_warning(latex)
         if not latex:
-            self.preview.setText("Preview")
+            self.preview.setText("Rendered preview")
             self.preview.setPixmap(QPixmap())
             return
         try:
@@ -444,6 +460,17 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             self.preview.setPixmap(QPixmap())
             self.preview.setText(f"Preview unavailable\n{exc}")
+
+    def _refresh_formula_warning(self, latex: str) -> None:
+        suspicious = looks_suspicious_formula_result(latex)
+        self.formula_warning.setVisible(suspicious)
+        if suspicious:
+            self.formula_warning.setText(
+                "수식이 아닌 자연어가 함께 선택된 것 같습니다. "
+                "Formula mode에서는 수식 부분만 다시 캡처하면 정확도가 높아집니다."
+            )
+        else:
+            self.formula_warning.clear()
 
     def _reload_history(self) -> None:
         self.history_list.clear()
