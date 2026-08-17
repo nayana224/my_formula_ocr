@@ -95,7 +95,7 @@ def text_to_latex(text: str) -> TextToLatexResult:
 
 def _clean_input(text: str) -> str:
     text = "".join(char for char in text if char not in _ZERO_WIDTH)
-    text = unicodedata.normalize("NFKC", text)
+    text = unicodedata.normalize("NFC", text)
     return text.strip()
 
 
@@ -145,5 +145,9 @@ def _replace_symbols(text: str) -> str:
 def _normalize_spacing(text: str) -> str:
     text = re.sub(r"[ \t]+", " ", text)
     text = re.sub(r"\s*([=+\-])\s*", r"\1", text)
-    text = re.sub(r"\\(sum|prod|times|div|pm|infty|leq|geq|neq|approx|in|notin|to|partial|nabla|[a-z]+)\s+", r"\\\1", text)
+    text = re.sub(
+        r"\\(sum|prod|times|div|pm|infty|leq|geq|neq|approx|in|notin|to|partial|nabla|[a-z]+)\s+",
+        r"\\\1",
+        text,
+    )
     return text.strip()
