@@ -59,6 +59,8 @@ class LatexPreviewWidget(QWidget):
             self._show_fallback()
             return
 
+        # 비동기 KaTeX 로딩 동안에는 최신 mathtext 결과를 보여준다.
+        self._show_fallback()
         self._web_view.setHtml(build_katex_html(latex))
 
     def _on_load_finished(self, success: bool) -> None:
@@ -107,8 +109,14 @@ def install_latex_preview(window) -> LatexPreviewWidget:
 def build_katex_html(latex: str) -> str:
     """사용자 LaTeX를 HTML attribute로 escape해 안전한 KaTeX 문서를 만든다."""
     escaped = html.escape(latex, quote=True)
-    css_url = f"https://cdn.jsdelivr.net/npm/katex@{_KATEX_VERSION}/dist/katex.min.css"
-    js_url = f"https://cdn.jsdelivr.net/npm/katex@{_KATEX_VERSION}/dist/katex.min.js"
+    css_url = (
+        f"https://cdn.jsdelivr.net/npm/katex@{_KATEX_VERSION}/dist/"
+        "katex.min.css"
+    )
+    js_url = (
+        f"https://cdn.jsdelivr.net/npm/katex@{_KATEX_VERSION}/dist/"
+        "katex.min.js"
+    )
     return f"""<!doctype html>
 <html>
 <head>
@@ -117,8 +125,19 @@ def build_katex_html(latex: str) -> str:
 <link rel="stylesheet" href="{css_url}" crossorigin="anonymous">
 <style>
 html, body {{ margin: 0; min-height: 100%; background: #fbfcfe; }}
-body {{ display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }}
-#formula {{ max-width: 100%; overflow-x: auto; overflow-y: hidden; font-size: 1.15rem; }}
+body {{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}}
+#formula {{
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  font-size: 1.15rem;
+}}
 </style>
 <script defer src="{js_url}" crossorigin="anonymous"></script>
 </head>
