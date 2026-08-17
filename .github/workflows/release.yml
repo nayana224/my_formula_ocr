@@ -9,6 +9,7 @@ on:
       - "v*"
     paths:
       - ".github/workflows/release.yml"
+      - ".github/RELEASE_TRIGGER"
       - "packaging/**"
       - "scripts/package_release.py"
       - "scripts/prepare_pix2tex.py"
@@ -86,23 +87,56 @@ jobs:
           compression-level: 0
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.ref == 'refs/heads/main' && startsWith(github.event.head_commit.message, 'release: v'))
     needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
 
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: release
           merge-multiple: true
 
+      - name: Resolve release tag
+        id: release_tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            subject="$(git log -1 --pretty=%s)"
+            tag="${subject#release: }"
+          fi
+          if [[ ! "${tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid release tag: ${tag}" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Normalize release filenames
+        shell: bash
+        run: |
+          tag="${{ steps.release_tag.outputs.tag }}"
+          for file in release/FormulaOCR-main-*.zip; do
+            if [[ -e "${file}" ]]; then
+              mv "${file}" "${file/FormulaOCR-main-/FormulaOCR-${tag}-}"
+            fi
+          done
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "${{ github.ref_name }}"
-          release/*.zip
-          --title "Formula OCR ${{ github.ref_name }}"
-          --generate-notes
+        shell: bash
+        run: |
+          tag="${{ steps.release_tag.outputs.tag }}"
+          gh release create "${tag}" \
+            release/*.zip \
+            --target "${GITHUB_SHA}" \
+            --title "Formula OCR ${tag}" \
+            --generate-notes
