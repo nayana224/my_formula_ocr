@@ -14,11 +14,14 @@ unset PYTHONPATH
 source .venv/bin/activate
 python - <<'PY'
 import importlib
+import importlib.metadata
+import os
 import platform
 import sys
 
 print(f"Python: {sys.version.split()[0]}")
 print(f"Platform: {platform.platform()}")
+print(f"Session: {os.environ.get('XDG_SESSION_TYPE', 'unknown')}")
 
 required = ("PySide6", "PIL", "matplotlib", "torch", "pix2tex")
 failed = False
@@ -31,6 +34,14 @@ for module_name in required:
     else:
         version = getattr(module, "__version__", "installed")
         print(f"[OK] {module_name}: {version}")
+
+try:
+    pynput_version = importlib.metadata.version("pynput")
+except importlib.metadata.PackageNotFoundError:
+    failed = True
+    print("[FAIL] pynput: not installed")
+else:
+    print(f"[OK] pynput: {pynput_version}")
 
 if failed:
     raise SystemExit(1)
