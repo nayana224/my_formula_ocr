@@ -30,6 +30,7 @@ from formula_ocr.capture.clipboard import qimage_to_pil
 from formula_ocr.history.database import HistoryDatabase, HistoryEntry
 from formula_ocr.latex.formatter import CopyFormat, format_latex
 from formula_ocr.latex.renderer import render_latex_preview
+from formula_ocr.latex.text_normalizer import TextToLatexResult, text_to_latex
 from formula_ocr.ocr.pix2tex_engine import Pix2TexEngine
 from formula_ocr.ocr.result_quality import looks_suspicious_formula_result
 from formula_ocr.ui.image_view import ImageView
@@ -64,9 +65,14 @@ class MainWindow(QMainWindow):
         self._worker.failed.connect(self._on_ocr_failed)
         self._worker_thread.start()
 
+        self._text_preview_timer = QTimer(self)
+        self._text_preview_timer.setSingleShot(True)
+        self._text_preview_timer.setInterval(350)
+        self._text_preview_timer.timeout.connect(self._preview_text_input)
+
         self.setWindowTitle("Formula OCR")
-        self.resize(1240, 800)
-        self.setMinimumSize(900, 620)
+        self.resize(1240, 840)
+        self.setMinimumSize(900, 660)
         self.setStatusBar(QStatusBar(self))
         self._build_ui()
         self._build_actions()
@@ -94,9 +100,48 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         self.image_view = ImageView()
         self.image_view.image_file_dropped.connect(self.load_image_file)
+        self.image_view.setMinimumSize(360, 230)
+
+        self.text_input = QPlainTextEdit()
+        self.text_input.setPlaceholderText(
+            "GPT/웹에서 복사한 수식 텍스트를 붙여넣거나 직접 입력하세요.\n"
+            "예: L=N1i=1∑N(m^i−mi)2"
+        )
+        self.text_input.setMinimumHeight(78)
+        self.text_input.setMaximumHeight(110)
+        self.text_input.textChanged.connect(self._schedule_text_preview)
+
+        self.text_warning = QLabel()
+        self.text_warning.setObjectName("formulaWarning")
+        self.text_warning.setWordWrap(True)
+        self.text_warning.setVisible(False)
+
+        convert_text_button = QPushButton("Convert Text")
+        convert_text_button.clicked.connect(self.convert_text_input)
+        clear_text_button = QPushButton("Clear Text")
+        clear_text_button.clicked.connect(self._clear_text_input)
+
+        text_actions = QHBoxLayout()
+        text_actions.setSpacing(8)
+        text_actions.addStretch(1)
+        text_actions.addWidget(convert_text_button)
+        text_actions.addWidget(clear_text_button)
+
+        source_layout = QVBoxLayout()
+        source_layout.setContentsMargins(18, 16, 18, 18)
+        source_layout.setSpacing(9)
+        source_layout.addWidget(self._section_label("Source Image"))
+        source_layout.addWidget(self.image_view, 3)
+        source_layout.addWidget(self._section_label("Text Input · live preview"))
+        source_layout.addWidget(self.text_input, 1)
+        source_layout.addWidget(self.text_warning)
+        source_layout.addLayout(text_actions)
+        source_card = QFrame()
+        source_card.setObjectName("card")
+        source_card.setLayout(source_layout)
 
         self.latex_edit = QPlainTextEdit()
-        self.latex_edit.setPlaceholderText("인식된 LaTeX를 여기에서 바로 수정할 수 있습니다.")
+        self.latex_edit.setPlaceholderText("인식되거나 변환된 LaTeX를 여기에서 바로 수정할 수 있습니다.")
         self.latex_edit.setMinimumHeight(90)
         self.latex_edit.setMaximumHeight(140)
         self.latex_edit.textChanged.connect(self._refresh_preview)
@@ -104,14 +149,12 @@ class MainWindow(QMainWindow):
         self.preview = QLabel("Rendered preview")
         self.preview.setObjectName("preview")
         self.preview.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.preview.setMinimumHeight(280)
+        self.preview.setMinimumHeight(310)
 
         self.formula_warning = QLabel()
         self.formula_warning.setObjectName("formulaWarning")
         self.formula_warning.setWordWrap(True)
         self.formula_warning.setVisible(False)
-
-        image_card = self._make_card("Source", self.image_view)
 
         result_layout = QVBoxLayout()
         result_layout.setContentsMargins(18, 16, 18, 18)
@@ -126,7 +169,7 @@ class MainWindow(QMainWindow):
         result_card.setLayout(result_layout)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(image_card)
+        splitter.addWidget(source_card)
         splitter.addWidget(result_card)
         splitter.setStretchFactor(0, 4)
         splitter.setStretchFactor(1, 6)
@@ -139,8 +182,9 @@ class MainWindow(QMainWindow):
 
         open_button = QPushButton("Open Image")
         open_button.clicked.connect(self.open_image_dialog)
-        paste_button = QPushButton("Paste Image")
-        paste_button.clicked.connect(self.paste_image)
+        smart_paste_button = QPushButton("Smart Paste")
+        smart_paste_button.setToolTip("Ctrl+V · 이미지면 OCR, 텍스트면 LaTeX 변환")
+        smart_paste_button.clicked.connect(self.smart_paste)
 
         self.run_ocr_button = QPushButton("Run OCR")
         self.run_ocr_button.clicked.connect(self.run_ocr)
@@ -149,16 +193,16 @@ class MainWindow(QMainWindow):
         action_layout.setSpacing(8)
         action_layout.addWidget(self.capture_button)
         action_layout.addWidget(open_button)
-        action_layout.addWidget(paste_button)
+        action_layout.addWidget(smart_paste_button)
         action_layout.addWidget(self.run_ocr_button)
         action_layout.addStretch(1)
 
         self.auto_ocr_check = QCheckBox("Auto OCR")
-        self.auto_ocr_check.setToolTip("Open/Paste/Drop 직후 자동으로 OCR을 실행합니다.")
+        self.auto_ocr_check.setToolTip("Open/Drop/이미지 Smart Paste 직후 자동 OCR")
         self.auto_ocr_check.toggled.connect(self._save_preferences)
 
         self.auto_copy_check = QCheckBox("Auto Copy")
-        self.auto_copy_check.setToolTip("OCR 성공 직후 선택한 형식을 clipboard에 복사합니다.")
+        self.auto_copy_check.setToolTip("OCR/확정 Text 변환 후 선택한 형식을 clipboard에 복사")
         self.auto_copy_check.toggled.connect(self._save_preferences)
 
         self.output_format = QComboBox()
@@ -179,9 +223,11 @@ class MainWindow(QMainWindow):
         automation_layout.addWidget(copy_button)
 
         formula_tip = QLabel(
-            "Formula mode · 자연어 문장보다 수식 영역만 선택하면 인식 정확도가 높아집니다."
+            "Smart Paste · Ctrl+V 하나로 clipboard 이미지와 수식 텍스트를 자동 구분합니다. "
+            "Text → LaTeX는 구조가 사라진 복사 문자열을 보수적으로 추정합니다."
         )
         formula_tip.setObjectName("hintLabel")
+        formula_tip.setWordWrap(True)
 
         controls_card = QFrame()
         controls_card.setObjectName("card")
@@ -212,8 +258,8 @@ class MainWindow(QMainWindow):
         history_controls.addWidget(clear_button)
 
         self.history_list = QListWidget()
-        self.history_list.setMinimumHeight(105)
-        self.history_list.setMaximumHeight(160)
+        self.history_list.setMinimumHeight(95)
+        self.history_list.setMaximumHeight(150)
         self.history_list.itemDoubleClicked.connect(self._restore_history_item)
 
         history_layout = QVBoxLayout()
@@ -242,9 +288,9 @@ class MainWindow(QMainWindow):
         open_action.setShortcut(QKeySequence.StandardKey.Open)
         open_action.triggered.connect(self.open_image_dialog)
 
-        paste_action = QAction("Paste image", self)
+        paste_action = QAction("Smart paste", self)
         paste_action.setShortcut(QKeySequence.StandardKey.Paste)
-        paste_action.triggered.connect(self.paste_image)
+        paste_action.triggered.connect(self.smart_paste)
 
         capture_action = QAction("Capture area", self)
         capture_action.setShortcut(QKeySequence("Ctrl+Shift+X"))
@@ -259,17 +305,6 @@ class MainWindow(QMainWindow):
         copy_action.triggered.connect(self.copy_selected_format)
 
         self.addActions([open_action, paste_action, capture_action, run_action, copy_action])
-
-    def _make_card(self, title: str, widget: QWidget) -> QFrame:
-        layout = QVBoxLayout()
-        layout.setContentsMargins(18, 16, 18, 18)
-        layout.setSpacing(10)
-        layout.addWidget(self._section_label(title))
-        layout.addWidget(widget, 1)
-        card = QFrame()
-        card.setObjectName("card")
-        card.setLayout(layout)
-        return card
 
     def _section_label(self, text: str) -> QLabel:
         label = QLabel(text)
@@ -315,7 +350,34 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(str(path), 3000)
         self._run_ocr_if_enabled()
 
+    def smart_paste(self) -> None:
+        from PySide6.QtWidgets import QApplication
+
+        clipboard = QApplication.clipboard()
+        mime_data = clipboard.mimeData()
+        if mime_data is None:
+            QMessageBox.information(self, "Clipboard", "Clipboard 내용을 읽을 수 없습니다.")
+            return
+
+        if mime_data.hasImage():
+            self._paste_clipboard_image()
+            return
+        if mime_data.hasText():
+            text = mime_data.text()
+            if text.strip():
+                self._text_preview_timer.stop()
+                self.text_input.setPlainText(text)
+                self._text_preview_timer.stop()
+                self.convert_text_input()
+                return
+
+        QMessageBox.information(self, "Clipboard", "지원되는 이미지나 텍스트가 없습니다.")
+
     def paste_image(self) -> None:
+        """기존 호출 호환성을 위해 image paste 동작을 유지한다."""
+        self._paste_clipboard_image()
+
+    def _paste_clipboard_image(self) -> None:
         from PySide6.QtWidgets import QApplication
 
         if self._ocr_busy:
@@ -331,6 +393,61 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Clipboard error", str(exc))
             return
         self._run_ocr_if_enabled()
+
+    def _schedule_text_preview(self) -> None:
+        self._text_preview_timer.start()
+
+    def _preview_text_input(self) -> None:
+        result = text_to_latex(self.text_input.toPlainText())
+        self._apply_text_result(result, persist=False, auto_copy=False)
+
+    def convert_text_input(self) -> None:
+        self._text_preview_timer.stop()
+        result = text_to_latex(self.text_input.toPlainText())
+        self._apply_text_result(
+            result,
+            persist=True,
+            auto_copy=self.auto_copy_check.isChecked(),
+        )
+
+    def _apply_text_result(
+        self,
+        result: TextToLatexResult,
+        *,
+        persist: bool,
+        auto_copy: bool,
+    ) -> None:
+        if not result.latex:
+            if persist:
+                self.statusBar().showMessage("변환할 텍스트를 입력해주세요.", 2500)
+            return
+
+        self.latex_edit.setPlainText(result.latex)
+        self._show_text_warnings(result.warnings)
+
+        if persist:
+            self._history.add(result.latex)
+            self._reload_history()
+            if auto_copy:
+                self.copy_selected_format()
+                self.statusBar().showMessage("Text → LaTeX 완료 · clipboard에 복사됨", 3000)
+            else:
+                self.statusBar().showMessage("Text → LaTeX 완료", 3000)
+        else:
+            self.statusBar().showMessage("Text preview updated", 1200)
+
+    def _show_text_warnings(self, warnings: tuple[str, ...]) -> None:
+        self.text_warning.setVisible(bool(warnings))
+        if warnings:
+            self.text_warning.setText("추정 변환 · " + " ".join(warnings))
+        else:
+            self.text_warning.clear()
+
+    def _clear_text_input(self) -> None:
+        self._text_preview_timer.stop()
+        self.text_input.clear()
+        self.text_warning.clear()
+        self.text_warning.setVisible(False)
 
     def capture_area(self) -> None:
         if self._ocr_busy:
