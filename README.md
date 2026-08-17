@@ -14,8 +14,8 @@ Equation image / copied math text → editable LaTeX desktop app for Linux and W
 - Choose Raw LaTeX, `$...$`, `\[...\]`, or `equation` output from one selector.
 - Keep Auto OCR / Auto Copy / output format preferences between runs.
 - Run local image OCR through `pix2tex` without sending the image to a remote API.
-- Render Preview with KaTeX when Qt WebEngine and KaTeX assets are available.
-- Fall back automatically to the existing matplotlib `mathtext` Preview when KaTeX cannot load or parse the expression.
+- Render Preview with local KaTeX assets when they are installed.
+- Fall back automatically to CDN KaTeX, then matplotlib `mathtext`, when local assets are unavailable.
 - Keep raw LaTeX as an editable secondary view.
 - Show non-blocking warnings for suspicious formula OCR or heuristic Text-to-LaTeX recovery.
 - Search local SQLite history, pin favorites, and delete individual entries.
@@ -64,25 +64,29 @@ Text: Type / Smart Paste
 
 ## Preview renderer
 
-Formula OCR v0.6.x uses a two-stage Preview path:
+Formula OCR v0.6.2 uses a three-stage Preview path:
 
 ```text
 LaTeX
   ↓
-KaTeX in Qt WebEngine
+Local KaTeX assets
   ↓ success
 Rendered Preview
 
-  └ failure / unavailable / offline
+  └ local assets unavailable
+          ↓
+      CDN KaTeX
+
+  └ KaTeX unavailable / parse failure
           ↓
 matplotlib mathtext fallback
 ```
 
-The KaTeX path uses a pinned KaTeX 0.17.0 browser build. The current implementation loads the KaTeX CSS, JavaScript, and fonts from jsDelivr. If those resources cannot be loaded, the existing local matplotlib renderer remains available automatically, so OCR and copy workflows do not depend on network access.
+Run `python scripts/vendor_katex.py` once while online to download the official KaTeX 0.17.0 pre-built release, verify its SHA-256 digest, and keep only `katex.min.css`, `katex.min.js`, and WOFF2 fonts under `src/formula_ocr/assets/katex/`. After that, rich Preview does not need network access. `./scripts/setup_ubuntu.sh` performs this step automatically.
+
+The KaTeX MIT license is stored alongside the vendored assets. `setuptools` package-data configuration includes the CSS, JavaScript, license, and WOFF2 fonts so later standalone builds can bundle the same offline renderer.
 
 On Linux, Formula OCR adds `--disable-gpu` to `QTWEBENGINE_CHROMIUM_FLAGS` before creating the application. This keeps Qt WebEngine on Chromium's software-rendering path and avoids unnecessary GPU/Vulkan initialization for the lightweight formula Preview. Existing user-provided Chromium flags are preserved. This setting does not disable PyTorch OCR acceleration or change the rest of the Qt Widgets UI.
-
-A future standalone packaging step can vendor the KaTeX assets so the richer Preview is also fully offline.
 
 ## Global capture shortcut
 
@@ -134,10 +138,11 @@ cd formula_ocr
 
 `pix2tex` can download model checkpoints on the first OCR run. The first run can therefore take longer and requires network access.
 
-After pulling a version that adds new Python dependencies, refresh the editable environment with:
+After pulling a version that adds or changes packaged assets, refresh with:
 
 ```bash
 source .venv/bin/activate
+python scripts/vendor_katex.py
 python -m pip install -e ".[ocr,dev]"
 ```
 
@@ -147,6 +152,7 @@ python -m pip install -e ".[ocr,dev]"
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
+python scripts/vendor_katex.py
 python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -e ".[ocr,dev]"
 python -m formula_ocr
@@ -158,6 +164,7 @@ python -m formula_ocr
 py -3.10 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
+python scripts/vendor_katex.py
 python -m pip install -e ".[ocr,dev]"
 python -m formula_ocr
 ```
@@ -180,13 +187,13 @@ Press `Esc` while selecting a capture region to cancel and return to the main wi
 
 ```bash
 python -m pytest -q
-python -m flake8 src tests --max-line-length=100
+python -m flake8 src tests scripts --max-line-length=100
 ```
 
 ## Known limitations
 
 - Text-to-LaTeX cannot perfectly restore structure that the source application removed during copy. Warnings mark heuristic or ambiguous recovery.
-- Rich KaTeX Preview currently loads browser assets from jsDelivr; without network access the app falls back to local matplotlib `mathtext`.
+- A fresh source checkout needs one online `scripts/vendor_katex.py` run before rich Preview becomes fully offline. If local assets are absent, CDN KaTeX and then local mathtext remain available as fallbacks.
 - KaTeX supports a broad subset of TeX but not every LaTeX package or command. Unsupported expressions fall back to mathtext when possible.
 - `pix2tex` is intended for mathematical expressions. Non-math screenshots can produce meaningless LaTeX.
 - Region capture currently uses Qt screen capture. Some Wayland policies can block or limit desktop screenshots.
@@ -194,12 +201,12 @@ python -m flake8 src tests --max-line-length=100
 
 ## Next milestone
 
-1. Validate v0.6.1 KaTeX Preview software rendering on Ubuntu.
-2. Vendor KaTeX assets during standalone packaging so rich Preview works fully offline.
-3. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
-4. Evaluate a separate Mixed Text + Formula mode without changing stable Formula mode.
-5. Add standalone Ubuntu and Windows builds and GitHub Releases.
+1. Validate v0.6.2 offline KaTeX Preview on Ubuntu and Windows.
+2. Add standalone Ubuntu and Windows builds that run `vendor_katex.py` before packaging.
+3. Publish signed/versioned GitHub Releases for those standalone builds.
+4. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
+5. Evaluate a separate Mixed Text + Formula mode without changing stable Formula mode.
 
 ## License
 
-MIT. Note that bundled or downloaded third-party models and dependencies retain their own licenses.
+MIT. Bundled or downloaded third-party models and dependencies retain their own licenses. KaTeX is included under its MIT license.
