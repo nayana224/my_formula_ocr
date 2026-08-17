@@ -14,3 +14,12 @@ def test_build_katex_html_does_not_embed_script_from_latex() -> None:
 
     assert '&lt;/script&gt;&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;' in document
     assert '</script><script>alert("x")</script>' not in document
+
+
+def test_build_katex_html_uses_relative_assets_for_offline_preview() -> None:
+    document = build_katex_html(r"\frac{1}{N}", use_local_assets=True)
+
+    assert 'href="katex.min.css"' in document
+    assert 'src="katex.min.js"' in document
+    assert "cdn.jsdelivr.net" not in document
+    assert "https://" not in document
