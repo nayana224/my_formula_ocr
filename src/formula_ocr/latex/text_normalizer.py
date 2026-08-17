@@ -112,7 +112,7 @@ def _strip_math_delimiters(text: str) -> str:
     pairs = (("$$", "$$"), (r"\[", r"\]"), (r"\(", r"\)"), ("$", "$"))
     for start, end in pairs:
         if clean.startswith(start) and clean.endswith(end) and len(clean) >= len(start) + len(end):
-            return clean[len(start) : -len(end)].strip()
+            return clean[len(start):-len(end)].strip()
     return clean
 
 
