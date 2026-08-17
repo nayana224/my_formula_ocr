@@ -11,6 +11,9 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 
+# Rich Preview가 설치 후 네트워크 없이 동작하도록 공식 KaTeX asset을 준비한다.
+python scripts/vendor_katex.py
+
 # CPU-only 개발 환경에서 불필요한 CUDA runtime 설치를 피한다.
 python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 python -m pip install -e ".[ocr,dev]"
