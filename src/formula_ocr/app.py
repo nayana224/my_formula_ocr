@@ -3,6 +3,10 @@ from __future__ import annotations
 import signal
 import sys
 
+from formula_ocr.runtime.webengine import configure_webengine_environment
+
+configure_webengine_environment()
+
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
