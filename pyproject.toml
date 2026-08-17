@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "formula-ocr"
-version = "0.6.1"
+version = "0.6.2"
 description = "Cross-platform desktop app for converting equation images and copied math text to LaTeX."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,6 +29,14 @@ formula-ocr = "formula_ocr.app:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+formula_ocr = [
+  "assets/katex/LICENSE",
+  "assets/katex/*.css",
+  "assets/katex/*.js",
+  "assets/katex/fonts/*.woff2",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
