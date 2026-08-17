@@ -21,6 +21,8 @@ Equation image / copied math text → editable LaTeX desktop app for Linux and W
 - Search local SQLite history, pin favorites, and delete individual entries.
 - Exit safely with `Ctrl+C`; an in-progress OCR is allowed to finish before shutdown.
 - Run unit tests on Ubuntu and Windows with GitHub Actions.
+- Build Ubuntu and Windows standalone ZIP packages with PyInstaller.
+- Publish both standalone packages automatically to GitHub Releases when a `v*` tag is pushed.
 
 ## Default workflow
 
@@ -64,7 +66,7 @@ Text: Type / Smart Paste
 
 ## Preview renderer
 
-Formula OCR v0.6.2 uses a three-stage Preview path:
+Formula OCR v0.7.0 uses a three-stage Preview path:
 
 ```text
 LaTeX
@@ -84,7 +86,7 @@ matplotlib mathtext fallback
 
 Run `python scripts/vendor_katex.py` once while online to download the official KaTeX 0.17.0 pre-built release, verify its SHA-256 digest, and keep only `katex.min.css`, `katex.min.js`, and WOFF2 fonts under `src/formula_ocr/assets/katex/`. After that, rich Preview does not need network access. `./scripts/setup_ubuntu.sh` performs this step automatically.
 
-The KaTeX MIT license is stored alongside the vendored assets. `setuptools` package-data configuration includes the CSS, JavaScript, license, and WOFF2 fonts so later standalone builds can bundle the same offline renderer.
+The KaTeX MIT license is stored alongside the vendored assets. `setuptools` package-data configuration includes the CSS, JavaScript, license, and WOFF2 fonts so standalone builds bundle the same offline renderer.
 
 On Linux, Formula OCR adds `--disable-gpu` to `QTWEBENGINE_CHROMIUM_FLAGS` before creating the application. This keeps Qt WebEngine on Chromium's software-rendering path and avoids unnecessary GPU/Vulkan initialization for the lightweight formula Preview. Existing user-provided Chromium flags are preserved. This setting does not disable PyTorch OCR acceleration or change the rest of the Qt Widgets UI.
 
@@ -124,6 +126,28 @@ L=N1i=1∑N(...)2  → L=\frac{1}{N}\sum_{i=1}^{N}(...)^{2}
 When layout information has already been lost during copy, reconstruction can be ambiguous. The UI shows a warning instead of silently guessing ambiguous adjacent identifiers such as `mi`.
 
 Formula image OCR currently operates in **Formula mode**. Select only the mathematical expression when possible. Natural-language text mixed into the image can be interpreted as mathematical symbols because `pix2tex` is a formula-recognition model rather than a general text OCR engine.
+
+## Standalone release
+
+Formula OCR v0.7.0 builds a PyInstaller `onedir` package for each supported release OS. End users do not need a separate Python or virtual environment after downloading and extracting the ZIP.
+
+A version tag starts the release workflow:
+
+```bash
+git tag v0.7.0
+git push origin v0.7.0
+```
+
+When both platform builds succeed, GitHub Actions creates a GitHub Release containing:
+
+```text
+FormulaOCR-v0.7.0-Ubuntu.zip
+FormulaOCR-v0.7.0-Windows.zip
+```
+
+Each archive contains a `FormulaOCR/` folder. Run `FormulaOCR/FormulaOCR` on Ubuntu or `FormulaOCR/FormulaOCR.exe` on Windows. The first actual pix2tex OCR can still download model checkpoints if they are not already present on the user's machine.
+
+The release workflow can also be started manually from GitHub Actions. Manual runs build and upload workflow artifacts but do not create a GitHub Release unless the workflow was triggered by a `v*` tag.
 
 ## Ubuntu development setup
 
@@ -190,22 +214,34 @@ python -m pytest -q
 python -m flake8 src tests scripts --max-line-length=100
 ```
 
+For a local standalone build:
+
+```bash
+python scripts/vendor_katex.py
+python -m pip install -e ".[ocr,dev,build]"
+python -m PyInstaller --noconfirm --clean packaging/FormulaOCR.spec
+python scripts/package_release.py --platform Ubuntu --version v0.7.0
+```
+
+Use `--platform Windows` on Windows.
+
 ## Known limitations
 
 - Text-to-LaTeX cannot perfectly restore structure that the source application removed during copy. Warnings mark heuristic or ambiguous recovery.
 - A fresh source checkout needs one online `scripts/vendor_katex.py` run before rich Preview becomes fully offline. If local assets are absent, CDN KaTeX and then local mathtext remain available as fallbacks.
 - KaTeX supports a broad subset of TeX but not every LaTeX package or command. Unsupported expressions fall back to mathtext when possible.
 - `pix2tex` is intended for mathematical expressions. Non-math screenshots can produce meaningless LaTeX.
+- The standalone application bundles the Python runtime and major dependencies, so release ZIP files are expected to be much larger than the source repository.
+- pix2tex model checkpoints are not bundled into the initial standalone package and can require network access on the first OCR run.
 - Region capture currently uses Qt screen capture. Some Wayland policies can block or limit desktop screenshots.
 - The system-wide `Ctrl+Alt+M` shortcut is currently supported on Windows and Linux X11, but not treated as reliable on Wayland.
 
 ## Next milestone
 
-1. Validate v0.6.2 offline KaTeX Preview on Ubuntu and Windows.
-2. Add standalone Ubuntu and Windows builds that run `vendor_katex.py` before packaging.
-3. Publish signed/versioned GitHub Releases for those standalone builds.
-4. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
-5. Evaluate a separate Mixed Text + Formula mode without changing stable Formula mode.
+1. Validate the v0.7.0 standalone package on a clean Ubuntu machine and a clean Windows machine.
+2. Add release signing/checksums after standalone behavior is validated.
+3. Add a Wayland global-shortcut backend through the XDG Desktop Portal where the desktop supports it.
+4. Evaluate a separate Mixed Text + Formula mode without changing stable Formula mode.
 
 ## License
 
