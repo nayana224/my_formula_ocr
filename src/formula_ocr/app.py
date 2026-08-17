@@ -7,6 +7,7 @@ from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
 
 from formula_ocr.input.global_hotkey import DEFAULT_HOTKEY_LABEL, GlobalHotkeyManager
+from formula_ocr.ui.latex_preview import install_latex_preview
 from formula_ocr.ui.main_window import MainWindow
 from formula_ocr.ui.theme import APP_STYLESHEET
 
@@ -18,6 +19,7 @@ def main() -> int:
     app.setStyleSheet(APP_STYLESHEET)
 
     window = MainWindow()
+    install_latex_preview(window)
     window.show()
 
     global_hotkey = GlobalHotkeyManager(app)
