@@ -3,8 +3,16 @@ name: release
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
+    paths:
+      - ".github/workflows/release.yml"
+      - "packaging/**"
+      - "scripts/package_release.py"
+      - "scripts/vendor_katex.py"
+      - "pyproject.toml"
 
 jobs:
   build:
