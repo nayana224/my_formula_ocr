@@ -11,6 +11,7 @@ on:
       - ".github/workflows/release.yml"
       - "packaging/**"
       - "scripts/package_release.py"
+      - "scripts/prepare_pix2tex.py"
       - "scripts/vendor_katex.py"
       - "pyproject.toml"
 
@@ -58,6 +59,9 @@ jobs:
 
       - name: Vendor offline KaTeX assets
         run: python scripts/vendor_katex.py
+
+      - name: Prepare pix2tex checkpoints
+        run: python scripts/prepare_pix2tex.py
 
       - name: Run tests
         run: python -m pytest -q
