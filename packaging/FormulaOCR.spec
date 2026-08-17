@@ -1,9 +1,11 @@
 from pathlib import Path
+import sys
 
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 
 PROJECT_ROOT = Path(SPECPATH).parent
+IS_WINDOWS = sys.platform.startswith("win")
 
 # OCR runtime의 package data와 동적 backend를 standalone 배포물에 포함한다.
 datas = collect_data_files("formula_ocr", includes=["assets/katex/**"])
@@ -25,25 +27,40 @@ analysis = Analysis(
 )
 pyz = PYZ(analysis.pure)
 
-executable = EXE(
-    pyz,
-    analysis.scripts,
-    [],
-    exclude_binaries=True,
-    name="FormulaOCR",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    console=False,
-)
+if IS_WINDOWS:
+    executable = EXE(
+        pyz,
+        analysis.scripts,
+        analysis.binaries,
+        analysis.datas,
+        [],
+        name="FormulaOCR",
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        console=False,
+    )
+else:
+    executable = EXE(
+        pyz,
+        analysis.scripts,
+        [],
+        exclude_binaries=True,
+        name="FormulaOCR",
+        debug=False,
+        bootloader_ignore_signals=False,
+        strip=False,
+        upx=False,
+        console=False,
+    )
 
-bundle = COLLECT(
-    executable,
-    analysis.binaries,
-    analysis.datas,
-    strip=False,
-    upx=False,
-    upx_exclude=[],
-    name="FormulaOCR",
-)
+    bundle = COLLECT(
+        executable,
+        analysis.binaries,
+        analysis.datas,
+        strip=False,
+        upx=False,
+        upx_exclude=[],
+        name="FormulaOCR",
+    )
